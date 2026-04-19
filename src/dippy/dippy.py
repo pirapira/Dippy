@@ -230,11 +230,17 @@ def check_mcp_tool(tool_name: str, config: Config) -> dict:
         config: Loaded configuration.
 
     Returns:
-        Hook response dict, or empty dict if no rules match (defer to default).
+        Hook response dict. If no rules match, applies config.default
+        ('ask' defers to Claude's default behavior).
     """
     match = match_mcp(tool_name, config)
     if match is None:
-        return {}  # No rules match - defer to Claude's default behavior
+        # No rules match - apply config default
+        if config.default == "allow":
+            return approve(f"MCP tool {tool_name}")
+        if config.default == "deny":
+            return deny(f"MCP tool {tool_name}")
+        return {}  # ask - defer to Claude's default behavior
     reason = match.message if match.message else f"[{match.pattern}]"
     log_decision(match.decision, reason, rule=match.pattern)
     if match.decision == "allow":

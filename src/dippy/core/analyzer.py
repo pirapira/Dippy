@@ -2,7 +2,8 @@
 Centralized AST analyzer for Dippy.
 
 Single recursive walk of bash AST with consistent decision-making.
-Unknown constructs default to ask. Decisions bubble up (deny > ask > allow).
+Unmatched commands use config.default (ask | allow | deny).
+Decisions bubble up (deny > ask > allow).
 """
 
 from __future__ import annotations
@@ -31,6 +32,11 @@ class Decision:
 
     def __repr__(self) -> str:
         return f"Decision({self.action!r}, {self.reason!r})"
+
+
+def _unmatched(config: Config, reason: str) -> Decision:
+    """Decision for commands with no matching rule - uses config.default."""
+    return Decision(config.default, reason)  # type: ignore[arg-type]
 
 
 def analyze(
@@ -219,8 +225,8 @@ def _analyze_node(node, config: Config, cwd: Path, *, remote: bool = False) -> D
         return Decision("allow", "empty")
 
     else:
-        # Unknown node type - default to ask
-        return Decision("ask", f"unrecognized construct: {kind}")
+        # Unknown node type - apply config default
+        return _unmatched(config, f"unrecognized construct: {kind}")
 
 
 def _analyze_command(
@@ -375,8 +381,8 @@ def _analyze_redirects(
                     msg = redirect_match.message or redirect_match.pattern
                     decisions.append(Decision("ask", f"redirect to {target}: {msg}"))
             else:
-                # No rule matched - default ask for output redirects
-                decisions.append(Decision("ask", f"redirect to {target}"))
+                # No rule matched - apply config default for output redirects
+                decisions.append(_unmatched(config, f"redirect to {target}"))
 
     return decisions
 
@@ -435,7 +441,7 @@ def _analyze_simple_command(
 
         if j < len(tokens):
             return _analyze_simple_command(tokens[j:], config, cwd, remote=remote)
-        return Decision("ask", base)
+        return _unmatched(config, base)
 
     # 3. Simple safe commands
     if base in SIMPLE_SAFE:
@@ -466,8 +472,8 @@ def _analyze_simple_command(
                         return Decision("ask", f"{desc}: {msg}")
                     # allow - continue checking other targets
                 else:
-                    # No matching rule - ask by default for file writes
-                    return Decision("ask", desc)
+                    # No matching rule - apply config default for file writes
+                    return _unmatched(config, desc)
         if result.action == "allow":
             return Decision("allow", desc)
         elif result.action == "delegate" and result.inner_command:
@@ -477,10 +483,10 @@ def _analyze_simple_command(
             )
             return inner_decision
         else:
-            return Decision("ask", desc)
+            return _unmatched(config, desc)
 
-    # 6. Unknown command - default ask
-    return Decision("ask", get_description(tokens, base))
+    # 6. Unknown command - apply config default
+    return _unmatched(config, get_description(tokens, base))
 
 
 def _is_version_or_help(tokens: list[str]) -> bool:
