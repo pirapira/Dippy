@@ -62,7 +62,7 @@ class Config:
     aliases: dict[str, str] = field(default_factory=dict)
     """Command aliases mapping source to target (e.g., ~/bin/gh -> gh)."""
 
-    default: str = "ask"  # 'allow' | 'ask'
+    default: str = "ask"  # 'allow' | 'ask' | 'deny'
     log: Path | None = None  # None = no logging
     log_full: bool = False  # log full command (requires log path)
 
@@ -420,8 +420,10 @@ def _apply_setting(settings: dict[str, bool | int | str | Path], rest: str) -> N
 
     # Choice settings
     elif key_normalized == "default":
-        if value not in ("allow", "ask"):
-            raise ValueError(f"'default' must be 'allow' or 'ask', got '{value}'")
+        if value not in ("allow", "ask", "deny"):
+            raise ValueError(
+                f"'default' must be 'allow', 'ask', or 'deny', got '{value}'"
+            )
         settings[key_normalized] = value
 
     # Path settings

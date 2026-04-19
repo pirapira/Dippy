@@ -551,6 +551,14 @@ class TestParseConfig:
         cfg = parse_config("set log")
         assert cfg.log is None
 
+    def test_set_default_deny(self):
+        cfg = parse_config("set default deny")
+        assert cfg.default == "deny"
+
+    def test_set_default_allow(self):
+        cfg = parse_config("set default allow")
+        assert cfg.default == "allow"
+
     def test_full_config(self):
         cfg = parse_config("""
 # User config

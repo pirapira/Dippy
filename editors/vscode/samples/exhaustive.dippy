@@ -188,6 +188,7 @@ set log_full
 # Value settings
 set default allow
 set default ask
+set default deny
 
 # Log path setting
 set log ~/.dippy/audit.log

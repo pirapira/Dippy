@@ -66,7 +66,7 @@
   },
   "set default": {
     "prefix": ["set default", "default"],
-    "body": "set default ${1|allow,ask|}",
+    "body": "set default ${1|allow,ask,deny|}",
     "description": "Set default decision for unmatched commands"
   },
   "section": {
