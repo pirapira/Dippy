@@ -62,3 +62,38 @@ class TestDefaultAllow:
     def test_explicit_ask_rule_still_asks(self):
         rules = [Rule(decision="ask", pattern="somecmd *")]
         assert _analyze("somecmd foo", default="allow", rules=rules).action == "ask"
+
+
+class TestParseFallthrough:
+    """Parser edge cases honor config.default (except truly empty input)."""
+
+    def test_empty_follows_default(self):
+        assert _analyze("", default="ask").action == "ask"
+        assert _analyze("", default="deny").action == "deny"
+        assert _analyze("   ", default="deny").action == "deny"
+        assert _analyze("", default="allow").action == "allow"
+
+    def test_parse_error_denies_on_default_deny(self):
+        # Unbalanced quote - unparseable.
+        assert _analyze('echo "unterminated', default="deny").action == "deny"
+
+    def test_parse_error_asks_on_default_ask(self):
+        assert _analyze('echo "unterminated', default="ask").action == "ask"
+
+
+class TestCmdsubInjection:
+    """Cmdsub injection risk never auto-allows; escalates to deny if default=deny."""
+
+    # Pure $(...) in arg position of a handler whose outer form isn't
+    # auto-allowed triggers the injection heuristic.
+    CMD = "git $(echo status)"
+
+    def test_asks_on_default_ask(self):
+        assert _analyze(self.CMD, default="ask").action == "ask"
+
+    def test_asks_on_default_allow(self):
+        # Suspicious - floor at ask, never auto-allow.
+        assert _analyze(self.CMD, default="allow").action == "ask"
+
+    def test_denies_on_default_deny(self):
+        assert _analyze(self.CMD, default="deny").action == "deny"

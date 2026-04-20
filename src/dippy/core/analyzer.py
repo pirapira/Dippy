@@ -39,6 +39,14 @@ def _unmatched(config: Config, reason: str) -> Decision:
     return Decision(config.default, reason)  # type: ignore[arg-type]
 
 
+def _ask_or_stricter(config: Config, reason: str) -> Decision:
+    """Decision for suspicious inputs (e.g. injection risk). Never auto-allows;
+    escalates to deny if config.default is deny, otherwise asks."""
+    if config.default == "deny":
+        return Decision("deny", reason)
+    return Decision("ask", reason)
+
+
 def analyze(
     command: str, config: Config, cwd: Path, *, remote: bool = False
 ) -> Decision:
@@ -57,15 +65,15 @@ def analyze(
     """
     command = command.strip()
     if not command:
-        return Decision("ask", "empty command")
+        return _unmatched(config, "empty command")
 
     try:
         nodes = parse(command)
     except ParseError as e:
-        return Decision("ask", f"parse error: {e.message}")
+        return _unmatched(config, f"parse error: {e.message}")
 
     if not nodes:
-        return Decision("ask", "empty command")
+        return _unmatched(config, "empty command")
 
     decisions = [_analyze_node(node, config, cwd, remote=remote) for node in nodes]
     return _combine(decisions)
@@ -296,7 +304,9 @@ def _analyze_command(
                     outer_result = handler.classify(HandlerContext(words[base_idx:]))
                     if outer_result.action != "allow":
                         inner_cmd = _get_word_value(word).strip("$()")
-                        return Decision("ask", f"cmdsub injection risk: {inner_cmd}")
+                        return _ask_or_stricter(
+                            config, f"cmdsub injection risk: {inner_cmd}"
+                        )
             elif part_kind == "param":
                 # Parameter expansion - check for cmdsubs in arg (raw string)
                 arg = getattr(part, "arg", None)
